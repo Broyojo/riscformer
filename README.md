@@ -8,7 +8,7 @@ real, unmodified RISC-V binaries compiled with GCC — including Doom.
 
 ![Doom gameplay rendered by Doom running on the transformer](docs/gameplay.png)
 
-*E1M1, attract-mode demo, 54.7M instructions in: the full 3D software
+*Attract-mode demo, 54.7M instructions in: the full 3D software
 renderer — BSP traversal, fixed-point texture mapping (soft-multiplied,
 rv32i has no MUL), sprites, status bar — executing on attention heads and
 threshold-logic MLPs. The [title screen](docs/title.png) appears at 13.6M
