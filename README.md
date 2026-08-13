@@ -6,11 +6,13 @@ residual stream) whose weights are **constructed analytically** so that one
 forward pass executes exactly one RV32I instruction, bit-exactly. It runs
 real, unmodified RISC-V binaries compiled with GCC — including Doom.
 
-![Doom title screen rendered by Doom running on the transformer](docs/title.png)
+![Doom gameplay rendered by Doom running on the transformer](docs/gameplay.png)
 
-*Frame 0: the Doom title screen, drawn by the game's own renderer after
-13.6M instructions — every one decoded, routed, and computed by attention
-heads and logic-gate MLPs.*
+*E1M1, attract-mode demo, 54.7M instructions in: the full 3D software
+renderer — BSP traversal, fixed-point texture mapping (soft-multiplied,
+rv32i has no MUL), sprites, status bar — executing on attention heads and
+threshold-logic MLPs. The [title screen](docs/title.png) appears at 13.6M
+instructions.*
 
 Why constructed rather than trained: Doom executes millions of instructions
 per frame. A learned model with even 99.999% per-instruction accuracy is
