@@ -1,0 +1,19 @@
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# generated artifacts
+tcpu/weights.bin
+tcpu/libtcpu.dylib
+tcpu/*.so
+
+# fetched assets (see doom/fetch_assets.sh)
+doom/doomgeneric/
+doom/doom1.wad
+
+# build & run outputs
+doom/build/
+doom/frames/
+doom/*.gif
+.default.cfg

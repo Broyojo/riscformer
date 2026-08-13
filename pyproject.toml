@@ -1,0 +1,23 @@
+[project]
+name = "riscformer"
+version = "0.1.0"
+description = "A transformer with hand-constructed weights that executes RV32I bit-exactly - one instruction per forward pass. Runs Doom."
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+authors = [{ name = "David" }]
+dependencies = [
+    "numpy>=2.0",
+    "pillow>=10.0",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.0",
+]
+
+[tool.uv]
+package = false
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
