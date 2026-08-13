@@ -1,6 +1,6 @@
 \documentclass[tikz, border=8pt]{standalone}
 \usepackage{amsmath, bm}
-\usetikzlibrary{calc, positioning, arrows.meta}
+\usetikzlibrary{calc, positioning, arrows.meta, backgrounds}
 
 \definecolor{ink}{HTML}{1C1C1E}
 \definecolor{inkgray}{HTML}{6E6E73}
@@ -15,6 +15,8 @@
 \pagecolor{white}
 \begin{document}
 \begin{tikzpicture}[x=1pt, y=1pt, outer sep=0pt,
+    show background rectangle,
+    background rectangle/.style={fill=white},
     t12/.style={inner sep=0pt, text=ink, font=\large},
     t11/.style={inner sep=0pt, text=ink, font=\normalsize},
     t9/.style={inner sep=0pt, text=ink, font=\small},
@@ -55,22 +57,22 @@
 
   % ============================ main stack ============================
   \node[module=mlared] (dec) at (340,-40) {Decode $+$ Immediates};
-  \node[module=attnblue, above=27pt of dec] (pwb) {Pending-Load Writeback};
-  \node[module=attnblue, above=27pt of pwb] (opf) {Operand Fetch};
-  \node[halfmod=moegreen, above=27pt of opf, xshift=-39.5pt] (shf) {Barrel Shifter};
-  \node[halfmod=moegreen, above=27pt of opf, xshift=39.5pt] (add) {$3\times$ KS Adders};
+  \node[module=attnblue, above=48pt of dec] (pwb) {Pending-Load Writeback};
+  \node[module=attnblue, above=48pt of pwb] (opf) {Operand Fetch};
+  \node[halfmod=moegreen, above=48pt of opf, xshift=-39.5pt] (shf) {Barrel Shifter};
+  \node[halfmod=moegreen, above=48pt of opf, xshift=39.5pt] (add) {$3\times$ KS Adders};
   \coordinate (exe) at ($(shf.north)!0.5!(add.north)$);
   \coordinate (exes) at ($(shf.south)!0.5!(add.south)$);
-  \node[module=mlared] (res) at ($(dec)+(0,4*46pt)$) {Flags $\cdot$ Result Mux};
-  \node[module=mlared, above=27pt of res] (npc) {Next-PC Mux};
-  \node[module=attnblue, above=27pt of npc] (rwb) {Register Writeback};
+  \node[module=mlared] (res) at ($(dec)+(0,4*67pt)$) {Flags $\cdot$ Result Mux};
+  \node[module=mlared, above=48pt of res] (npc) {Next-PC Mux};
+  \node[module=attnblue, above=48pt of npc] (rwb) {Register Writeback};
 
   % residual adds between stages
   \foreach \a/\b/\p in {dec/pwb/p1, pwb/opf/p2, res/npc/p5, npc/rwb/p6}
     \node[oplus] (\p) at ($(\a.north)!0.5!(\b.south)$) {};
   \node[oplus] (p3) at ($(opf.north)!0.5!(exes)$) {};
   \node[oplus] (p4) at ($(exe)!0.5!(res.south)$) {};
-  \node[oplus, above=15pt of rwb] (p7) {};
+  \node[oplus, above=26pt of rwb] (p7) {};
 
   % vertical flow
   \draw[flow] (dec.north) -- (p1.south);
@@ -91,7 +93,7 @@
   \draw[flow] (rwb.north) -- (p7.south);
 
   % residual skip wires (left lane)
-  \coordinate (bin) at ($(dec.south)+(0,-24pt)$);
+  \coordinate (bin) at ($(dec.south)+(0,-18pt)$);
   \draw[flow, rounded corners=3pt] ($(bin)+(-4pt,0)$) -- ++(-92pt,0) |- ([yshift=-6pt]p1.west);
   \foreach \p/\q in {p1/p2, p2/p3, p3/p4, p4/p5, p5/p6, p6/p7}
     \draw[flow, rounded corners=3pt] (\p.west) -- ++(-88pt,0) |- (\q.west);
@@ -102,7 +104,7 @@
   \node[t8, anchor=west] at ($(add.east)+(7pt,0)$) {B4--B11};
 
   % embedding chip + input
-  \node[chip, below=24pt of dec] (emb) {Embed Machine State};
+  \node[chip, below=36pt of dec] (emb) {Embed Machine State};
   \node[t8, below=4pt of emb, align=center]
     {34 tokens $\times$ 1187 dims:\ \ CTL $\cdot$ INSTR $\cdot$ x0\,\dots\,x31\\
      every signal one dim, exactly $0.0$ or $1.0$};

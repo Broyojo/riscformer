@@ -24,8 +24,8 @@ architecture, not from fitting.
 *One forward pass executes one instruction. Attention layers (blue) route
 operands between tokens; MLP layers (red/green) are threshold-logic circuits.
 The zoom panels show the two constructions that make it exact. Source:
-`docs/arch.tex` (TikZ), rebuild with `tectonic docs/arch.tex && pdftocairo
--svg docs/arch.pdf docs/architecture.svg`.*
+`docs/arch.tex` (TikZ); rebuild with `docs/build.sh` (needs tectonic +
+poppler).*
 
 **Tokens = machine state.** 34 tokens: one control token (PC + pending-load
 record), one instruction token (instruction word in, all decode/ALU work),
