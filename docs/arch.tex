@@ -80,11 +80,12 @@
     {34 tokens $\times$ 1187 dims:\ \ CTL $\cdot$ INSTR $\cdot$ x0\,\dots\,x31\\
      every signal one dim, exactly $0.0$ or $1.0$};
 
-  % residual skip wires: tap the trunk below each module, rejoin above it
+  % residual skip wires: exit each join's west, re-enter the next join low-west
   \coordinate (bin) at ($(emb.north)+(0,14pt)$);
-  \draw[flow, rounded corners=3pt] (bin) -- ++(-92pt,0) |- (p1.west);
-  \foreach \p/\q in {p1/p2, p2/p3, p3/p4, p4/p5, p5/p6, p6/p7}
-    \draw[flow, rounded corners=3pt] ($(\p.north)+(0,8pt)$) -- ++(-92pt,0) |- (\q.west);
+  \draw[flow, rounded corners=3pt] ($(bin)+(-4pt,0)$) -- ++(-92pt,0) |- ([yshift=-5pt]p1.west);
+  \foreach \p/\q in {p1/p2, p2/p3, p3/p4, p4/p5, p5/p6}
+    \draw[flow, rounded corners=3pt] (\p.west) -- ++(-88pt,0) |- ([yshift=-5pt]\q.west);
+  \draw[flow, rounded corners=3pt] (p6.west) -- ++(-88pt,0) |- (p7.west);
 
   % vertical flow
   \draw[flow] (dec.north) -- (p1.south);
