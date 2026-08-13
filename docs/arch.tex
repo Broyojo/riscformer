@@ -74,6 +74,18 @@
   \node[oplus] (p4) at ($(exe)!0.5!(res.south)$) {};
   \node[oplus, above=26pt of rwb] (p7) {};
 
+  % embedding chip
+  \node[chip, below=36pt of dec] (emb) {Embed Machine State};
+  \node[t8, below=4pt of emb, align=center]
+    {34 tokens $\times$ 1187 dims:\ \ CTL $\cdot$ INSTR $\cdot$ x0\,\dots\,x31\\
+     every signal one dim, exactly $0.0$ or $1.0$};
+
+  % residual skip wires: tap the trunk below each module, rejoin above it
+  \coordinate (bin) at ($(emb.north)+(0,14pt)$);
+  \draw[flow, rounded corners=3pt] (bin) -- ++(-92pt,0) |- (p1.west);
+  \foreach \p/\q in {p1/p2, p2/p3, p3/p4, p4/p5, p5/p6, p6/p7}
+    \draw[flow, rounded corners=3pt] ($(\p.north)+(0,8pt)$) -- ++(-92pt,0) |- (\q.west);
+
   % vertical flow
   \draw[flow] (dec.north) -- (p1.south);
   \draw[flow] (p1.north) -- (pwb.south);
@@ -92,22 +104,11 @@
   \draw[flow] (p6.north) -- (rwb.south);
   \draw[flow] (rwb.north) -- (p7.south);
 
-  % residual skip wires (left lane)
-  \coordinate (bin) at ($(dec.south)+(0,-18pt)$);
-  \draw[flow, rounded corners=3pt] ($(bin)+(-4pt,0)$) -- ++(-92pt,0) |- ([yshift=-6pt]p1.west);
-  \foreach \p/\q in {p1/p2, p2/p3, p3/p4, p4/p5, p5/p6, p6/p7}
-    \draw[flow, rounded corners=3pt] (\p.west) -- ++(-88pt,0) |- (\q.west);
-
   % block indices
   \foreach \m/\l in {dec/B0--B1, pwb/B2, opf/B3, res/B12--B13, npc/B14, rwb/B15}
     \node[t8, anchor=west] at ($(\m.east)+(7pt,0)$) {\l};
   \node[t8, anchor=west] at ($(add.east)+(7pt,0)$) {B4--B11};
 
-  % embedding chip + input
-  \node[chip, below=36pt of dec] (emb) {Embed Machine State};
-  \node[t8, below=4pt of emb, align=center]
-    {34 tokens $\times$ 1187 dims:\ \ CTL $\cdot$ INSTR $\cdot$ x0\,\dots\,x31\\
-     every signal one dim, exactly $0.0$ or $1.0$};
   \draw[flow] (emb.north) -- (dec.south);
 
   % output
