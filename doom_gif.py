@@ -13,11 +13,14 @@ def main():
     ap.add_argument("--frames-dir", default="doom/frames")
     ap.add_argument("--out", default="doom/doom.gif")
     ap.add_argument("--every", type=int, default=1)
-    ap.add_argument("--ms", type=int, default=100)
+    ap.add_argument("--ms", type=int, default=40,
+                    help="per-frame delay; 1 frame = 1 game tic (1/35 s)")
+    ap.add_argument("--start", type=int, default=0,
+                    help="first frame index (skip the title screen)")
     args = ap.parse_args()
 
     paths = sorted(pathlib.Path(args.frames_dir).glob("frame_*.png"))
-    paths = paths[::args.every]
+    paths = paths[args.start::args.every]
     if not paths:
         print("no frames yet")
         return
