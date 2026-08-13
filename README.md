@@ -19,6 +19,14 @@ architecture, not from fitting.
 
 ## How it works
 
+![riscformer architecture](docs/architecture.svg)
+
+*One forward pass executes one instruction. Attention layers (blue) route
+operands between tokens; MLP layers (red/green) are threshold-logic circuits.
+The zoom panels show the two constructions that make it exact. Source:
+`docs/arch.tex` (TikZ), rebuild with `tectonic docs/arch.tex && pdftocairo
+-svg docs/arch.pdf docs/architecture.svg`.*
+
 **Tokens = machine state.** 34 tokens: one control token (PC + pending-load
 record), one instruction token (instruction word in, all decode/ALU work),
 and 32 register tokens (index one-hot + 32 value bits). Every logical signal
@@ -45,12 +53,6 @@ harness is only motherboard wiring: it fetches RAM[PC] into the instruction
 token, services the load/store the core emitted, and feeds the output state
 back in — autoregression over machine steps. Loads use an internalized
 load-delay slot (the "pending load" record), architecturally invisible.
-
-```
-state_t  ──embed──▶  [CTL │ INSTR │ x0..x31]  ──16 blocks──▶  state_{t+1}
-                        ▲                          │
-                        └──── RAM (instruction fetch, load/store) ◀──┘
-```
 
 ## Verification
 
