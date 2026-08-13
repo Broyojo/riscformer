@@ -59,11 +59,11 @@
   \node[module=mlared] (dec) at (340,-40) {Decode $+$ Immediates};
   \node[module=attnblue, above=48pt of dec] (pwb) {Pending-Load Writeback};
   \node[module=attnblue, above=48pt of pwb] (opf) {Operand Fetch};
-  \node[halfmod=moegreen, above=48pt of opf, xshift=-39.5pt] (shf) {Barrel Shifter};
-  \node[halfmod=moegreen, above=48pt of opf, xshift=39.5pt] (add) {$3\times$ KS Adders};
+  \node[halfmod=moegreen, above=64pt of opf, xshift=-39.5pt] (shf) {Barrel Shifter};
+  \node[halfmod=moegreen, above=64pt of opf, xshift=39.5pt] (add) {$3\times$ KS Adders};
   \coordinate (exe) at ($(shf.north)!0.5!(add.north)$);
   \coordinate (exes) at ($(shf.south)!0.5!(add.south)$);
-  \node[module=mlared] (res) at ($(dec)+(0,4*67pt)$) {Flags $\cdot$ Result Mux};
+  \node[module=mlared] (res) at ($(dec)+(0,4*67pt+16pt)$) {Flags $\cdot$ Result Mux};
   \node[module=mlared, above=48pt of res] (npc) {Next-PC Mux};
   \node[module=attnblue, above=48pt of npc] (rwb) {Register Writeback};
 
@@ -92,11 +92,13 @@
   \draw[flow] (pwb.north) -- (p2.south);
   \draw[flow] (p2.north) -- (opf.south);
   \draw[flow] (opf.north) -- (p3.south);
-  \draw[flow] (p3.north) -- ++(0,5pt) coordinate (fork);
-  \draw[flow] (fork) -| (shf.south);
-  \draw[flow] (fork) -| (add.south);
-  \draw[flow] (shf.north) |- ($(p4.south)+(0,-5pt)$) -- (p4.south);
-  \draw[wire] (add.north) |- ($(p4.south)+(0,-5pt)$);
+  \coordinate (fork) at ($(p3.north)+(0,18pt)$);
+  \draw[wire] (p3.north) -- (fork);
+  \draw[flow, rounded corners=3pt] (fork) -| (shf.south);
+  \draw[flow, rounded corners=3pt] (fork) -| (add.south);
+  \draw[wire, rounded corners=3pt] (shf.north) |- ($(p4.south)+(0,-8pt)$);
+  \draw[wire, rounded corners=3pt] (add.north) |- ($(p4.south)+(0,-8pt)$);
+  \draw[flow] ($(p4.south)+(0,-8pt)$) -- (p4.south);
   \draw[flow] (p4.north) -- (res.south);
   \draw[flow] (res.north) -- (p5.south);
   \draw[flow] (p5.north) -- (npc.south);
