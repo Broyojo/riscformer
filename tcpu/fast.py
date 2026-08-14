@@ -7,7 +7,7 @@ import subprocess
 import numpy as np
 
 HERE = pathlib.Path(__file__).resolve().parent
-LIB = HERE / "libtcpu.dylib"
+LIB = pathlib.Path(os.environ.get("TCPU_LIB", HERE / "libtcpu.dylib"))
 SRC = HERE / "engine.c"
 WEIGHTS = HERE / "weights.bin"
 
@@ -84,3 +84,11 @@ class FastCPU:
 
     def run(self, max_steps):
         return self.lib.tf_run(max_steps)
+
+    def prof(self):
+        buf = (ctypes.c_double * 8)()
+        self.lib.tf_prof(buf)
+        return list(buf)
+
+    def prof_reset(self):
+        self.lib.tf_prof_reset()
