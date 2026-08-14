@@ -71,14 +71,26 @@ def main():
                 ib = ((instr_logits > 0) == (instr_tgt > 0.5)) | (instr_mask == 0)
                 bit_acc = rb.float().mean().item()
                 exact = (rb.all(dim=(1, 2)) & ib.all(dim=1)).float().mean().item()
-                # carry tail: reg-bit accuracy by bit position, 4-bit buckets
-                pos_acc = rb.float().mean(dim=(0, 1)).cpu().numpy()
-                tail = " ".join(f"{pos_acc[i:i+4].mean():.3f}"
-                                for i in range(0, 32, 4))
+                # carry tail over the *written* register only: recover rd and
+                # opcode from the instruction bits, keep reg-writing classes
+                import numpy as _np
+                iw = feats[:, 1, :32].cpu().numpy().astype(_np.int64)
+                inst = (iw * (1 << _np.arange(32))).sum(axis=1)
+                opc = inst & 0x7F
+                rd = (inst >> 7) & 0x1F
+                writes = _np.isin(opc, [0x33, 0x13, 0x37, 0x17, 0x6F, 0x67])
+                sel = writes & (rd != 0)
+                if sel.any():
+                    idx = _np.nonzero(sel)[0]
+                    rdb = rb[idx, rd[idx], :].float().mean(dim=0).cpu().numpy()
+                    tail = " ".join(f"{rdb[i:i+4].mean():.3f}"
+                                    for i in range(0, 32, 4))
+                else:
+                    tail = "n/a"
                 rate = step * args.batch / (time.time() - t0)
                 print(f"[{step:6d}] loss {loss.item():.4f}  bit {bit_acc:.5f}  "
                       f"exact-instr {exact:.4f}  ex/s {rate:,.0f}\n"
-                      f"         carry-tail(b0..b31) {tail}", flush=True)
+                      f"         rd-tail(b0..b31) {tail}", flush=True)
             torch.save({"model": model.state_dict(),
                         "args": vars(args), "step": step}, args.ckpt)
     print("done")
