@@ -80,6 +80,10 @@ class TransformerCPU:
         npc = self._field(x, T_INSTR, "NPC")
         f3v = self._field(x, T_INSTR, "F3")
         f3 = f3v.bit_length() - 1 if f3v else 0
+        if self._flag(x, T_INSTR, "ISM") and f3 >= 4:
+            raise RuntimeError(
+                f"M-extension divide/remainder not implemented (pc={self.pc:#x}); "
+                f"compile with -mno-div")
 
         # pending load from *previous* step has now been consumed
         self.plf = 0

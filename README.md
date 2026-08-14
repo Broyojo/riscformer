@@ -9,10 +9,9 @@ real, unmodified RISC-V binaries compiled with GCC — including Doom.
 ![Doom gameplay rendered by Doom running on the transformer](docs/gameplay.png)
 
 *Attract-mode demo, 54.7M instructions in: the full 3D software
-renderer — BSP traversal, fixed-point texture mapping (soft-multiplied,
-rv32i has no MUL), sprites, status bar — executing on attention heads and
-threshold-logic MLPs. The [title screen](docs/title.png) appears at 13.6M
-instructions.*
+renderer — BSP traversal, fixed-point texture mapping, sprites, status
+bar — executing on attention heads and threshold-logic MLPs. The
+[title screen](docs/title.png) appears at 13.6M instructions.*
 
 Why constructed rather than trained: Doom executes millions of instructions
 per frame. A learned model with even 99.999% per-instruction accuracy is
@@ -47,8 +46,14 @@ step function built from two ReLUs: `step(p) = relu(p) - relu(p-1)`, which is
 *exactly* 0 or 1 for integer-valued pre-activations. On top of that: a full
 instruction decoder, immediate assembly for all 5 formats, three parallel
 32-bit Kogge-Stone carry-lookahead adders (ALU, branch target, PC+4), a 5-stage
-barrel shifter, signed/unsigned comparators, and the result/next-PC muxes.
-16 blocks, one instruction per forward pass, 18.2M parameters (99.4% zeros).
+barrel shifter, signed/unsigned comparators, the result/next-PC muxes — and a
+single-pass 32x32->64 multiplier (MUL/MULH/MULHU/MULHSU). The multiplier
+exploits a trick silicon doesn't have: one threshold layer can *count*, so a
+whole partial-product column compresses in a single layer (h>=k units with
+telescoped output weights), collapsing the usual Wallace-tree depth into three
+counter layers plus a 64-bit prefix adder, all folded into the existing
+blocks' spare dims. 16 blocks, one instruction per forward pass, d_model 3176,
+102M parameters (99.9% zeros; 1.4 MB sparse).
 
 **Memory = the bus.** The transformer computes addresses and store data; the
 harness is only motherboard wiring: it fetches RAM[PC] into the instruction
@@ -68,11 +73,10 @@ including all syscall traffic.
 
 ## Execution engines
 
-- `harness.py` — numpy, the model as literal dense matrices (~180 instr/s).
+- `harness.py` — numpy, the model as literal dense matrices.
 - `tcpu/engine.c` — identical forward pass with sparse weight storage and
-  activation-sparsity tracking (~10-17k instr/s). Verified equivalent.
-  (The constructed weights are 99.4% zeros; the C engine stores them sparse
-  but computes the same math.)
+  activation-sparsity tracking (~17k instr/s; the multiplier costs non-multiply
+  instructions nothing because its dims stay zero). Verified equivalent.
 
 ## Quick start
 
@@ -122,9 +126,11 @@ doom/port/       doomgeneric platform layer + mini-libc for rv32i
 tests/           differential test suite
 ```
 
+Doom is compiled `-march=rv32im -mno-div`: multiplies run in hardware (one
+forward pass), while division stays in software (`doom/port/softdiv.c`) —
+division has no shallow threshold circuit and is rare in Doom.
+
 ## Roadmap
 
-- M extension (hardware multiply/divide in the residual stream) — Doom on
-  rv32i soft-multiplies ~200 instructions per `FixedMul`; a constructed
-  multiplier is a 5-15x speedup on rendering.
 - Keyboard input scripting over the ecall bridge to actually *play* it.
+- Threading the C engine's per-token loops (~2-3x).

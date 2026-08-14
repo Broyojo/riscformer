@@ -235,3 +235,42 @@ def test_c_engine_matches_reference():
         assert cpu.pc == ref.pc, n
         for r in range(32):
             assert cpu.reg(r) == ref.regs[r], (n, r)
+
+
+def test_m_extension_multiply(core):
+    """All four M-extension multiplies, adversarial values, vs reference."""
+    seeds = [0, 1, 0xFFFFFFFF, 0x80000000, 0x7FFFFFFF, 0xFFFF8000,
+             0x00010001, 0xDEADBEEF]
+    words = []
+    for r, v in enumerate(seeds, start=1):
+        hi = ((v + 0x800) >> 12) & 0xFFFFF
+        words.append(enc.lui(r, hi))
+        words.append(enc.addi(r, r, ((v & 0xFFF) ^ 0x800) - 0x800))
+    for op in (enc.mul, enc.mulh, enc.mulhsu, enc.mulhu):
+        for a in range(1, 9):
+            for b in range(1, 9):
+                words.append(op(9 + (a + b) % 3, a, b))
+    words.append(enc.ecall())
+    run_diff(core, words, 300)
+
+
+def test_c_engine_multiply():
+    from tcpu.fast import FastCPU
+    words = [enc.lui(1, 0x89ABD), enc.addi(1, 1, 0xDEF - 4096),
+             enc.addi(2, 0, -3)]
+    body = [enc.mul(3, 1, 2), enc.mulh(4, 1, 2), enc.mulhu(5, 1, 2),
+            enc.mulhsu(6, 1, 2), enc.add(1, 1, 3), enc.xor(2, 2, 4)]
+    words += body
+    words.append(enc.jal(0, -4 * len(body)))
+    blob = b"".join(w.to_bytes(4, "little") for w in words)
+    bus = Bus()
+    bus.load_blob(BASE, blob)
+    ref = RefCPU(bus, pc=BASE)
+    cpu = FastCPU(ram_base=0, ram_size=1 << 20, pc=BASE)
+    cpu.write_blob(BASE, blob)
+    for n in range(400):
+        ref.step()
+        cpu.run(1)
+        assert cpu.pc == ref.pc, n
+        for r in range(32):
+            assert cpu.reg(r) == ref.regs[r], (n, r)

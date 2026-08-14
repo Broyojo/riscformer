@@ -59,11 +59,20 @@
   \node[module=mlared] (dec) at (340,-40) {Decode $+$ Immediates};
   \node[module=attnblue, above=48pt of dec] (pwb) {Pending-Load Writeback};
   \node[module=attnblue, above=48pt of pwb] (opf) {Operand Fetch};
-  \node[halfmod=moegreen, above=64pt of opf, xshift=-39.5pt] (shf) {Barrel Shifter};
-  \node[halfmod=moegreen, above=64pt of opf, xshift=39.5pt] (add) {$3\times$ KS Adders};
-  \coordinate (exe) at ($(shf.north)!0.5!(add.north)$);
-  \coordinate (exes) at ($(shf.south)!0.5!(add.south)$);
-  \node[module=mlared] (res) at ($(dec)+(0,4*67pt+16pt)$) {Flags $\cdot$ Result Mux};
+  \node[draw=ink, fill=grayfill, line width=1.2pt, rounded corners=3pt,
+        minimum width=196pt, minimum height=46pt, inner sep=0pt,
+        above=40pt of opf] (exec) {};
+  \node[pbox=moegreen, minimum width=58pt, minimum height=16pt]
+        at ($(exec.center)+(-64pt,6pt)$) {\footnotesize Barrel Shifter};
+  \node[pbox=moegreen, minimum width=58pt, minimum height=16pt]
+        at ($(exec.center)+(0pt,6pt)$) {\footnotesize $3\times$ KS Adders};
+  \node[pbox=moegreen, minimum width=58pt, minimum height=16pt]
+        at ($(exec.center)+(64pt,6pt)$) {\footnotesize Multiplier};
+  \node[t8] at ($(exec.center)+(0,-12pt)$)
+        {parallel dims of the same MLPs};
+  \coordinate (exe) at (exec.north);
+  \coordinate (exes) at (exec.south);
+  \node[module=mlared] (res) at ($(dec)+(0,287pt)$) {Flags $\cdot$ Result Mux};
   \node[module=mlared, above=48pt of res] (npc) {Next-PC Mux};
   \node[module=attnblue, above=48pt of npc] (rwb) {Register Writeback};
 
@@ -77,15 +86,15 @@
   % embedding chip
   \node[chip, below=36pt of dec] (emb) {Embed Machine State};
   \node[t8, below=4pt of emb, align=center]
-    {34 tokens $\times$ 1187 dims:\ \ CTL $\cdot$ INSTR $\cdot$ x0\,\dots\,x31\\
+    {34 tokens $\times$ 3176 dims:\ \ CTL $\cdot$ INSTR $\cdot$ x0\,\dots\,x31\\
      every signal one dim, exactly $0.0$ or $1.0$};
 
   % residual skip wires: exit each join's west, re-enter the next join low-west
   \coordinate (bin) at ($(emb.north)+(0,14pt)$);
-  \draw[flow, rounded corners=3pt] ($(bin)+(-4pt,0)$) -- ++(-92pt,0) |- ([yshift=-5pt]p1.west);
+  \draw[flow, rounded corners=3pt] ($(bin)+(-4pt,0)$) -- ++(-107pt,0) |- ([yshift=-5pt]p1.west);
   \foreach \p/\q in {p1/p2, p2/p3, p3/p4, p4/p5, p5/p6}
-    \draw[flow, rounded corners=3pt] (\p.west) -- ++(-88pt,0) |- ([yshift=-5pt]\q.west);
-  \draw[flow, rounded corners=3pt] (p6.west) -- ++(-88pt,0) |- (p7.west);
+    \draw[flow, rounded corners=3pt] (\p.west) -- ++(-104pt,0) |- ([yshift=-5pt]\q.west);
+  \draw[flow, rounded corners=3pt] (p6.west) -- ++(-104pt,0) |- (p7.west);
 
   % vertical flow
   \draw[flow] (dec.north) -- (p1.south);
@@ -93,13 +102,8 @@
   \draw[flow] (pwb.north) -- (p2.south);
   \draw[flow] (p2.north) -- (opf.south);
   \draw[flow] (opf.north) -- (p3.south);
-  \coordinate (fork) at ($(p3.north)+(0,18pt)$);
-  \draw[wire] (p3.north) -- (fork);
-  \draw[flow, rounded corners=3pt] (fork) -| (shf.south);
-  \draw[flow, rounded corners=3pt] (fork) -| (add.south);
-  \draw[wire, rounded corners=3pt] (shf.north) |- ($(p4.south)+(0,-8pt)$);
-  \draw[wire, rounded corners=3pt] (add.north) |- ($(p4.south)+(0,-8pt)$);
-  \draw[flow] ($(p4.south)+(0,-8pt)$) -- (p4.south);
+  \draw[flow] (p3.north) -- (exec.south);
+  \draw[flow] (exec.north) -- (p4.south);
   \draw[flow] (p4.north) -- (res.south);
   \draw[flow] (res.north) -- (p5.south);
   \draw[flow] (p5.north) -- (npc.south);
@@ -110,7 +114,7 @@
   % block indices
   \foreach \m/\l in {dec/B0--B1, pwb/B2, opf/B3, res/B12--B13, npc/B14, rwb/B15}
     \node[t8, anchor=west] at ($(\m.east)+(7pt,0)$) {\l};
-  \node[t8, anchor=west] at ($(add.east)+(7pt,0)$) {B4--B11};
+  \node[t8, anchor=south east] at ($(exec.north east)+(0pt,3pt)$) {B4--B14};
 
   \draw[flow] (emb.north) -- (dec.south);
 
@@ -119,7 +123,7 @@
   \draw[flow] (p7.north) -- (out.south);
 
   % ============================ RAM + recurrence ============================
-  \node[ramchip] (ram) at ($(add.east)+(102pt,0)$) {RAM};
+  \node[ramchip] (ram) at ($(exec.east)+(79pt,0)$) {RAM};
   \node[t8, below=3pt of ram] {the bus};
   \draw[busarr, rounded corners=3pt] ($(ram.south)+(-20pt,0)$) |- ($(emb.east)+(0,3pt)$);
   \node[t8, anchor=west, text=buscol] at ($(ram.south)+(-16pt,-30pt)$) {fetch RAM[PC]};

@@ -72,7 +72,29 @@ class RefCPU:
         npc = (self.pc + 4) & MASK32
         wr = None
 
-        if op == 0x33:  # OP
+        if op == 0x33 and (f7 & 1):  # M extension
+            sa, sb = sext(a, 32), sext(b, 32)
+            if f3 == 0:
+                wr = (a * b) & MASK32
+            elif f3 == 1:
+                wr = ((sa * sb) >> 32) & MASK32
+            elif f3 == 2:
+                wr = ((sa * b) >> 32) & MASK32
+            elif f3 == 3:
+                wr = ((a * b) >> 32) & MASK32
+            elif f3 == 4:
+                wr = MASK32 if b == 0 else (
+                    0x80000000 if (sa, sb) == (-0x80000000, -1)
+                    else (abs(sa) // abs(sb) * (1 if (sa < 0) == (sb < 0) else -1)) & MASK32)
+            elif f3 == 5:
+                wr = MASK32 if b == 0 else (a // b) & MASK32
+            elif f3 == 6:
+                wr = a if b == 0 else (
+                    0 if (sa, sb) == (-0x80000000, -1)
+                    else (abs(sa) % abs(sb) * (1 if sa >= 0 else -1)) & MASK32)
+            elif f3 == 7:
+                wr = a if b == 0 else (a % b) & MASK32
+        elif op == 0x33:  # OP
             if f3 == 0:
                 wr = (a - b if f7 & 0x20 else a + b) & MASK32
             elif f3 == 1:

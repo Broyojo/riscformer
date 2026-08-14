@@ -39,7 +39,7 @@ static Block *blocks;
 typedef struct { char name[32]; int base, size; } Field;
 static Field *fields; static int nfields;
 static int f_TT_CTL, f_TT_INSTR, f_TT_REG, f_RIDX, f_VAL, f_IW, f_PC, f_PLF,
-    f_PLRD, f_PLD, f_NPC, f_F3, f_AS, f_BRAW, f_PLF_N, f_PLRD_N, f_IMM;
+    f_PLRD, f_PLD, f_NPC, f_F3, f_AS, f_BRAW, f_PLF_N, f_PLRD_N, f_IMM, f_ISM;
 static int f_CLS[16]; static int nCLS;
 static int f_CLS_LOAD, f_CLS_STORE, f_CLS_SYS;
 
@@ -134,7 +134,7 @@ int tf_load(const char *path) {
     f_F3 = fbase("F3"); f_AS = fbase("AS"); f_BRAW = fbase("BRAW");
     f_PLF_N = fbase("PLF_N"); f_PLRD_N = fbase("PLRD_N"); f_IMM = fbase("IMM");
     f_CLS_LOAD = fbase("CLS_LOAD"); f_CLS_STORE = fbase("CLS_STORE");
-    f_CLS_SYS = fbase("CLS_SYS");
+    f_CLS_SYS = fbase("CLS_SYS"); f_ISM = fbase("ISM");
     nCLS = 0;
     for (int i = 0; i < nfields; i++)
         if (!strncmp(fields[i].name, "CLS_", 4)) f_CLS[nCLS++] = fields[i].base;
@@ -360,6 +360,7 @@ int tf_run(int64_t max_steps) {
         plf = 0;
         int ret = -1;
         if (!any) ret = R_ILLEGAL;
+        else if (flag(T_INSTR, f_ISM) && f3 >= 4) ret = R_ILLEGAL;  /* div: -mno-div */
         else if (flag(T_INSTR, f_CLS_STORE)) {
             bus_write(field_u32(T_INSTR, f_AS, 32), 1 << (f3 & 3),
                       field_u32(T_INSTR, f_BRAW, 32));

@@ -4,7 +4,7 @@ set -e
 cd "$(dirname "$0")"
 CC=riscv64-elf-gcc
 SRC=doomgeneric/doomgeneric
-CFLAGS="-march=rv32i -mabi=ilp32 -O2 -fno-strict-aliasing -ffreestanding
+CFLAGS="-march=rv32im -mabi=ilp32 -mno-div -O2 -fno-strict-aliasing -ffreestanding
   -DCMAP256 -DDOOMGENERIC_RESX=320 -DDOOMGENERIC_RESY=200
   -Iport/include -I$SRC -Iport -w"
 
@@ -31,8 +31,9 @@ $CC $CFLAGS -c port/start.S -o build/start.o
 
 echo "  LD doom.elf"
 $CC $CFLAGS -c port/libmini.c -o build/libmini.o
+$CC $CFLAGS -c port/softdiv.c -o build/softdiv.o
 $CC $CFLAGS -nostdlib -T port/link.ld \
-    build/start.o build/dg_tcpu.o build/syscalls.o build/libmini.o \
+    build/start.o build/dg_tcpu.o build/syscalls.o build/libmini.o build/softdiv.o \
     $(printf 'build/%s.o ' "${OBJS[@]}") \
     -lgcc -o build/doom.elf
 riscv64-elf-objcopy -O binary build/doom.elf build/doom.bin

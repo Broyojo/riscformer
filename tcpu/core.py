@@ -63,6 +63,17 @@ def build_core(dtype=None):
     dm.alloc("IMM", 32)
     for f in ("USE_IMM", "SUBF", "LEFT", "RIGHT", "FILL", "NOTJUMP"):
         dm.alloc(f)
+    # M extension: single-pass multiplier via column-counter tree
+    for f in ("ISM", "MODE1", "MODE2", "CB1", "CB2"):
+        dm.alloc(f)
+    dm.alloc("PP", 1024)    # pp[j*32+i] = A_i & B_j, weight 2^(i+j)
+    dm.alloc("CR1", 32)     # correction row: -a31*b over high half (mulh/mulhsu)
+    dm.alloc("CR2", 32)     # correction row: -b31*a (mulh)
+    dm.alloc("CS1", 384)    # column counts, pass 1: 64 cols x 6 bits
+    dm.alloc("CS2", 192)    # pass 2: 64 x 3
+    dm.alloc("CS3", 128)    # pass 3: 64 x 2
+    for f in ("MG", "MP", "MP0"):
+        dm.alloc(f, 64)     # 64-bit final carry-propagate adder
     dm.alloc("ARAW", 32)
     dm.alloc("A", 32)
     dm.alloc("BRAW", 32)
@@ -92,6 +103,9 @@ def build_core(dtype=None):
     def W(b, terms, theta, outs):
         blocks[b].when(TI, terms, theta, outs)
 
+    def WU(b, terms, theta, outs):
+        blocks[b].gate(terms, theta, outs)
+
     # ---- B0: primary decode (all on INSTR token) ----
     for name, opc in CLASSES.items():
         v = (opc >> 2) & 0x1F
@@ -115,6 +129,10 @@ def build_core(dtype=None):
                 terms.append((d("IW", j + 12), -1.0))
         W(0, terms, npos, [(d("F3", v), 1.0)])
     W(0, [(d("IW", 30), 1.0)], 1, [(d("F7B5"), 1.0)])
+    # ISM: OP-class opcode pattern (bits 6..2 = 01100) and funct7 bit 0
+    W(0, [(d("IW", 6), -1.0), (d("IW", 5), 1.0), (d("IW", 4), 1.0),
+          (d("IW", 3), -1.0), (d("IW", 2), -1.0), (d("IW", 25), 1.0)], 3,
+      [(d("ISM"), 1.0)])
     for field, lo in (("RS1", 15), ("RS2", 20), ("RD", 7)):
         for v in range(32):
             terms = []
@@ -171,8 +189,12 @@ def build_core(dtype=None):
     for c, f3 in (("OP", 2), ("OP", 3), ("OPIMM", 2), ("OPIMM", 3)):
         W(1, [(d("CLS_" + c), 1.0), (d("F3", f3), 1.0)], 2, [(d("SUBF"), 1.0)])
     W(1, [(d("CLS_BR"), 1.0)], 1, [(d("SUBF"), 1.0)])
-    W(1, [(d("F3", 1), 2.0), (d("CLS_OP"), 1.0), (d("CLS_OPIMM"), 1.0)], 3, [(d("LEFT"), 1.0)])
-    W(1, [(d("F3", 5), 2.0), (d("CLS_OP"), 1.0), (d("CLS_OPIMM"), 1.0)], 3, [(d("RIGHT"), 1.0)])
+    W(1, [(d("F3", 1), 2.0), (d("CLS_OP"), 1.0), (d("CLS_OPIMM"), 1.0),
+          (d("ISM"), -2.0)], 3, [(d("LEFT"), 1.0)])
+    W(1, [(d("F3", 5), 2.0), (d("CLS_OP"), 1.0), (d("CLS_OPIMM"), 1.0),
+          (d("ISM"), -2.0)], 3, [(d("RIGHT"), 1.0)])
+    W(1, [(d("ISM"), 2.0), (d("F3", 1), 1.0), (d("F3", 2), 1.0)], 3, [(d("MODE1"), 1.0)])
+    W(1, [(d("ISM"), 1.0), (d("F3", 1), 1.0)], 2, [(d("MODE2"), 1.0)])
     W(1, [(d("CLS_JAL"), -1.0), (d("CLS_JALR"), -1.0), (d("CLS_BR"), -1.0)], 0,
       [(d("NOTJUMP"), 1.0)])
     wr_cls = [(d("CLS_" + c), 1.0) for c in ("OP", "OPIMM", "LUI", "AUIPC", "JAL", "JALR")]
@@ -281,6 +303,121 @@ def build_core(dtype=None):
     emit_adder("T", "PCL", Y="IMM")
     emit_adder("Q", "PCL", Yconst=4)
 
+    # ---- M-extension multiplier ----
+    # B4: partial products from the *cleaned* operands (INSTR-token-only dims,
+    # so non-INSTR tokens never probe these gates)
+    for j in range(32):
+        for i in range(32):
+            WU(4, [(d("ISM"), 2.0), (d("A", i), 1.0), (d("BSEL", j), 1.0)],
+               4, [(d("PP", j * 32 + i), 1.0)])
+    # signed corrections (two's-complement rows over the high half):
+    #   mulh/mulhsu: high -= a31 * b   ->  add a31*(~b_j) at col 32+j, +a31 at col 32
+    #   mulh:        high -= b31 * a
+    for j in range(32):
+        WU(4, [(d("MODE1"), 2.0), (d("A", 31), 1.0), (d("BSEL", j), -1.0)],
+           3, [(d("CR1", j), 1.0)])
+        WU(4, [(d("MODE2"), 2.0), (d("BSEL", 31), 1.0), (d("A", j), -1.0)],
+           3, [(d("CR2", j), 1.0)])
+    WU(4, [(d("MODE1"), 1.0), (d("A", 31), 1.0)], 2, [(d("CB1"), 1.0)])
+    WU(4, [(d("MODE2"), 1.0), (d("BSEL", 31), 1.0)], 2, [(d("CB2"), 1.0)])
+
+    # column-counter tree: one threshold layer counts a whole column; output
+    # weights f(k)-f(k-1) telescope to any function of the count
+    def emit_colsum(block, incols, outname, outbits):
+        outcols = {c: [] for c in range(64)}
+        for c in range(64):
+            ins = incols[c]
+            n = len(ins)
+            if n == 0:
+                continue
+            terms = [(dd, 1.0) for dd in ins]
+            written = set()
+            for k in range(1, n + 1):
+                outs = []
+                for b in range(outbits):
+                    if c + b >= 64:
+                        continue
+                    w = ((k >> b) & 1) - (((k - 1) >> b) & 1)
+                    if w:
+                        dim = d(outname, c * outbits + b)
+                        outs.append((dim, float(w)))
+                        written.add((c + b, dim))
+                if outs:
+                    WU(block, terms, k, outs)
+            for cc, dim in written:
+                if dim not in outcols[cc]:
+                    outcols[cc].append(dim)
+        return outcols
+
+    mcols = {c: [] for c in range(64)}
+    for j in range(32):
+        for i in range(32):
+            mcols[i + j].append(d("PP", j * 32 + i))
+    for j in range(32):
+        mcols[32 + j].append(d("CR1", j))
+        mcols[32 + j].append(d("CR2", j))
+    mcols[32].append(d("CB1"))
+    mcols[32].append(d("CB2"))
+
+    mcols = emit_colsum(5, mcols, "CS1", 6)
+    mcols = emit_colsum(6, mcols, "CS2", 3)
+    # Final counter layer emits the 64-bit adder's generate/propagate directly.
+    # Column c's addend bit is X = n_c & 1; the incoming half-carry row is
+    # Y = n_{c-1} >> 1. Both are functions of v = 4*n_{c-1} + n_c, which is
+    # injective over the 4x4 count lattice, so one threshold layer (h >= m,
+    # m = 1..v_max) with telescoped output weights computes G = X&Y, P = X^Y.
+    for c in range(64):
+        ins_c = mcols[c]
+        ins_p = mcols[c - 1] if c >= 1 else []
+        n_c, n_p = len(ins_c), len(ins_p)
+        assert n_c <= 3 and n_p <= 3, (c, n_c, n_p)
+        if n_c == 0 and n_p == 0:
+            continue
+        terms = [(dd, 4.0) for dd in ins_p] + [(dd, 1.0) for dd in ins_c]
+        vmax = 4 * n_p + n_c
+
+        def fXY(v):
+            X = (v & 3) & 1
+            Y = (v >> 2) >> 1
+            return X, Y
+
+        for m in range(1, vmax + 1):
+            gx, gy = fXY(m)
+            px, py = fXY(m - 1)
+            wg = (gx & gy) - (px & py)
+            wp = (gx ^ gy) - (px ^ py)
+            outs = []
+            if wg:
+                outs.append((d("MG", c), float(wg)))
+            if wp:
+                outs.append((d("MP0", c), float(wp)))
+                outs.append((d("MP", c), float(wp)))
+            if outs:
+                WU(7, terms, m, outs)
+    for lvl, dd_ in enumerate((1, 2, 4, 8, 16, 32)):
+        b = 8 + lvl
+        for i in range(dd_, 64):
+            WU(b, [(d("MG", i), 2.0), (d("MP", i), 1.0), (d("MG", i - dd_), 1.0)],
+               2, [(d("MG", i), 1.0)])
+            WU(b, [(d("MG", i), 1.0)], 1, [(d("MG", i), -1.0)])
+            WU(b, [(d("MP", i), 1.0), (d("MP", i - dd_), 1.0)], 2, [(d("MP", i), 1.0)])
+            WU(b, [(d("MP", i), 1.0)], 1, [(d("MP", i), -1.0)])
+    # sum bits + word select fused (B14): MUL -> low word, MULH* -> high word
+    hf3 = [(d("F3", 1), 2.0), (d("F3", 2), 2.0), (d("F3", 3), 2.0)]
+    for i in range(32):
+        out = [(d("RESULT", i), 1.0)]
+        if i == 0:
+            WU(14, [(d("ISM"), 2.0), (d("F3", 0), 2.0), (d("MP0", 0), 2.0)], 6, out)
+        else:
+            WU(14, [(d("ISM"), 2.0), (d("F3", 0), 2.0), (d("MP0", i), 2.0),
+                    (d("MG", i - 1), -2.0)], 6, out)
+            WU(14, [(d("ISM"), 2.0), (d("F3", 0), 2.0), (d("MG", i - 1), 2.0),
+                    (d("MP0", i), -2.0)], 6, out)
+        WU(14, [(d("ISM"), 2.0)] + hf3 + [(d("MP0", 32 + i), 2.0),
+                (d("MG", 31 + i), -2.0)], 6, out)
+        WU(14, [(d("ISM"), 2.0)] + hf3 + [(d("MG", 31 + i), 2.0),
+                (d("MP0", 32 + i), -2.0)], 6, out)
+
     # ---- B12: compare flags ----
     W(12, [(d("AS", i), -1.0) for i in range(32)], 0, [(d("F_EQ"), 1.0)])
     W(12, [(d("AG", 31), -1.0)], 0, [(d("F_LTU"), 1.0)])
@@ -290,14 +427,14 @@ def build_core(dtype=None):
     W(12, [(a31, 1.0), (b31, 1.0), (s31, 1.0)], 3, [(d("F_LT"), 1.0)])
 
     # ---- B13: RESULT mux + branch-taken ----
-    alu2 = [(d("CLS_OP"), 2.0), (d("CLS_OPIMM"), 2.0)]
+    alu2 = [(d("CLS_OP"), 2.0), (d("CLS_OPIMM"), 2.0), (d("ISM"), -2.0)]
     for i in range(32):
         out = [(d("RESULT", i), 1.0)]
         W(13, alu2 + [(d("F3", 0), 2.0), (d("AS", i), 1.0)], 5, out)
         W(13, alu2 + [(d("F3", 4), 2.0), (d("A", i), 1.0), (d("BSEL", i), -1.0)], 5, out)
         W(13, alu2 + [(d("F3", 4), 2.0), (d("BSEL", i), 1.0), (d("A", i), -1.0)], 5, out)
-        W(13, [(d("CLS_OP"), 3.0), (d("CLS_OPIMM"), 3.0), (d("F3", 6), 3.0),
-               (d("A", i), 1.0), (d("BSEL", i), 1.0)], 7, out)
+        W(13, [(d("CLS_OP"), 3.0), (d("CLS_OPIMM"), 3.0), (d("ISM"), -3.0),
+               (d("F3", 6), 3.0), (d("A", i), 1.0), (d("BSEL", i), 1.0)], 7, out)
         W(13, alu2 + [(d("F3", 7), 2.0), (d("A", i), 1.0), (d("BSEL", i), 1.0)], 6, out)
         W(13, [(d("LEFT"), 1.0), (d("RIGHT"), 1.0), (d("SH", i), 1.0)], 2, out)
         W(13, [(d("CLS_LUI"), 1.0), (d("IMM", i), 1.0)], 2, out)

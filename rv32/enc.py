@@ -82,3 +82,14 @@ def jalr(rd, base, imm): return _i(0x67, rd, 0, base, imm)
 def ecall(): return 0x00000073
 def ebreak(): return 0x00100073
 def nop(): return addi(0, 0, 0)
+
+
+# M extension (funct7 = 1)
+def mul(rd, a, b): return _r(0x33, rd, 0, a, b, 1)
+def mulh(rd, a, b): return _r(0x33, rd, 1, a, b, 1)
+def mulhsu(rd, a, b): return _r(0x33, rd, 2, a, b, 1)
+def mulhu(rd, a, b): return _r(0x33, rd, 3, a, b, 1)
+def div(rd, a, b): return _r(0x33, rd, 4, a, b, 1)
+def divu(rd, a, b): return _r(0x33, rd, 5, a, b, 1)
+def rem(rd, a, b): return _r(0x33, rd, 6, a, b, 1)
+def remu(rd, a, b): return _r(0x33, rd, 7, a, b, 1)
