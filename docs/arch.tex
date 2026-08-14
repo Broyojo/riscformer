@@ -123,19 +123,19 @@
   \draw[flow] (p7.north) -- (out.south);
 
   % ============================ RAM + recurrence ============================
-  \node[ramchip] (ram) at ($(exec.east)+(79pt,0)$) {RAM};
-  \node[t8, below=3pt of ram] {the bus};
-  \draw[busarr, rounded corners=3pt] ($(ram.south)+(-20pt,0)$) |- ($(emb.east)+(0,3pt)$);
-  \node[t8, anchor=west, text=buscol] at ($(ram.south)+(-16pt,-30pt)$) {fetch RAM[PC]};
-  \draw[busarr, rounded corners=3pt] ($(p7.east)+(0,0)$) -- ++(132pt,0) |- ($(ram.north)+(-12pt,14pt)$) -- ($(ram.north)+(-12pt,0)$);
-  \node[t8, anchor=west, text=buscol, align=left] at ($(p7.east)+(140pt,0pt)$) {load $\cdot$ store $\cdot$ ecall};
+  \node[ramchip, align=center] (ram) at ($(exec.east)+(79pt,0)$)
+        {RAM\\{\footnotesize\textcolor{inkgray}{the bus}}};
+  \draw[busarr, rounded corners=3pt] (ram.south) |- ($(emb.east)+(0,3pt)$);
+  \node[t8, anchor=east, text=buscol] at ($(ram.south)+(-8pt,-30pt)$) {fetch RAM[PC]};
+  \draw[busarr, rounded corners=3pt] (p7.east) -- (p7.east -| ram.north) -- (ram.north);
+  \node[t8, anchor=south east, text=buscol] at ($(p7.east -| ram.north)+(-8pt,4pt)$) {load $\cdot$ store $\cdot$ ecall};
   % recurrence lane (outermost right)
   \coordinate (rtap) at ($(p7.north)+(0,20pt)$);
   \draw[flow, rounded corners=4pt] (rtap) -- ++(230pt,0) |- ($(emb.east)+(0,-4pt)$);
   \node[t8, rotate=90, anchor=center] at ($(ram.east)+(78pt,-40pt)$) {one forward pass $=$ one instruction};
 
   % main dashed frame
-  \coordinate (frSW) at ($(dec.west)+(-104pt,-40pt)$);
+  \coordinate (frSW) at ($(dec.west)+(-61pt,-40pt)$);
   \coordinate (frNE) at ($(rwb.east)+(48pt,58pt)$);
   \draw[mainframe] (frSW) rectangle (frNE);
   \node[t8, anchor=south west] at ($(frSW |- frNE)+(4pt,3pt)$) {riscformer core (16 blocks)};
