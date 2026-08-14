@@ -21,6 +21,53 @@ def abscos(M):
     return np.abs(X @ X.T)
 
 
+def constructed_vectors():
+    """The hand-designed core's counterparts, built from its real dim registry:
+    slot identity = TT_* flag (+ RIDX one-hot for registers); each input
+    feature owns a dedicated residual dimension (payload bits map to VAL/IW/PC
+    depending on slot type -- all disjoint, so features are exactly one-hot)."""
+    from tcpu.core import build_core
+    _, dm = build_core()
+    D = dm.n
+    pos = np.zeros((34, D))
+    pos[0, dm.bit("TT_CTL")] = 1
+    pos[1, dm.bit("TT_INSTR")] = 1
+    for r in range(32):
+        pos[2 + r, dm.bit("TT_REG")] = 1
+        pos[2 + r, dm.bit("RIDX", r)] = 1
+    feat = np.zeros((97, D))
+    for i in range(32):
+        feat[i, dm.bit("VAL", i)] = 1
+        feat[i, dm.bit("IW", i)] = 1
+        feat[i, dm.bit("PC", i)] = 1
+    feat[32, dm.bit("PLF")] = 1
+    for k in range(32):
+        feat[33 + k, dm.bit("PLRD", k)] = 1
+    for i in range(32):
+        feat[65 + i, dm.bit("PLD", i)] = 1
+    return pos, feat
+
+
+def _panel(ax, M, title, kind, fig):
+    im = ax.imshow(M, vmin=0, vmax=1, cmap="viridis")
+    ax.set_title(title, fontsize=10)
+    if kind == "pos":
+        ticks = [0, 1] + list(range(2, 34, 4))
+        labels = ["CTL", "INSTR"] + [f"x{r - 2}" for r in range(2, 34, 4)]
+        ax.set_xticks(ticks); ax.set_xticklabels(labels, rotation=45, fontsize=7)
+        ax.set_yticks(ticks); ax.set_yticklabels(labels, fontsize=7)
+    else:
+        b = [0, 32, 33, 65, 97]
+        for edge in b[1:-1]:
+            ax.axhline(edge - 0.5, color="w", lw=0.6, alpha=0.6)
+            ax.axvline(edge - 0.5, color="w", lw=0.6, alpha=0.6)
+        mid = [(b[i] + b[i + 1]) / 2 for i in range(len(b) - 1)]
+        names = ["payload 0-31", "PLF", "PLRD", "PLD"]
+        ax.set_xticks(mid); ax.set_xticklabels(names, rotation=30, fontsize=7)
+        ax.set_yticks(mid); ax.set_yticklabels(names, fontsize=7)
+    fig.colorbar(im, ax=ax, fraction=0.046)
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--ckpt", default="learned/ckpt.pt")
@@ -31,34 +78,22 @@ def main():
     a = ck["args"]
     model = LearnedRiscformer(a["d"], a["layers"], a["heads"])
     model.load_state_dict(ck["model"])
+    pos_l = model.pos.detach().numpy()
+    feat_l = model.inp.weight.detach().numpy().T
 
-    pos = model.pos.detach().numpy()                  # (34, d)
-    feat = model.inp.weight.detach().numpy().T        # (97, d): feature f -> column
+    pos_c, feat_c = constructed_vectors()
 
-    fig, axes = plt.subplots(1, 2, figsize=(13, 5.6))
-    fig.suptitle(f"learned embedding geometry  |cos(x,y)|   "
-                 f"(ckpt step {ck['step']}, d={a['d']})")
-
-    im0 = axes[0].imshow(abscos(pos), vmin=0, vmax=1, cmap="viridis")
-    axes[0].set_title("positional embeddings (34 slots)")
-    ticks = [0, 1] + list(range(2, 34, 4))
-    labels = ["CTL", "INSTR"] + [f"x{r - 2}" for r in range(2, 34, 4)]
-    axes[0].set_xticks(ticks); axes[0].set_xticklabels(labels, rotation=45)
-    axes[0].set_yticks(ticks); axes[0].set_yticklabels(labels)
-    fig.colorbar(im0, ax=axes[0], fraction=0.046)
-
-    im1 = axes[1].imshow(abscos(feat), vmin=0, vmax=1, cmap="viridis")
-    axes[1].set_title("input-feature embeddings (97 features)")
-    b = [0, 32, 33, 65, 97]
-    for edge in b[1:-1]:
-        axes[1].axhline(edge - 0.5, color="w", lw=0.6, alpha=0.6)
-        axes[1].axvline(edge - 0.5, color="w", lw=0.6, alpha=0.6)
-    mid = [(b[i] + b[i + 1]) / 2 for i in range(len(b) - 1)]
-    names = ["payload bits 0-31", "PLF", "PLRD one-hot", "PLD bits"]
-    axes[1].set_xticks(mid); axes[1].set_xticklabels(names, rotation=30, fontsize=8)
-    axes[1].set_yticks(mid); axes[1].set_yticklabels(names, fontsize=8)
-    fig.colorbar(im1, ax=axes[1], fraction=0.046)
-
+    fig, axes = plt.subplots(2, 2, figsize=(12.5, 11))
+    fig.suptitle("embedding geometry  |cos(x,y)|  --  constructed (top) vs "
+                 f"learned (bottom, ckpt step {ck['step']}, d={a['d']})")
+    _panel(axes[0, 0], abscos(pos_c),
+           "constructed: slot identity (TT_* + RIDX), d=3176", "pos", fig)
+    _panel(axes[0, 1], abscos(feat_c),
+           "constructed: input features (dedicated dims)", "feat", fig)
+    _panel(axes[1, 0], abscos(pos_l),
+           f"learned: positional embeddings, d={a['d']}", "pos", fig)
+    _panel(axes[1, 1], abscos(feat_l),
+           f"learned: input-feature embeddings, d={a['d']}", "feat", fig)
     fig.tight_layout()
     fig.savefig(args.out, dpi=140)
     print(f"saved {args.out}")
