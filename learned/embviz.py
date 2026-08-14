@@ -15,10 +15,26 @@ import matplotlib.pyplot as plt
 from .model import LearnedRiscformer, pick_device
 
 
-def abscos(M):
-    """M: (n, d) -> (n, n) matrix of |cos(x_i, x_j)|."""
+def abscos(M, center=False):
+    """M: (n, d) -> (n, n) matrix of |cos(x_i, x_j)|. center=True removes the
+    shared mean direction first (learned embeddings carry a global component
+    that inflates every pairwise similarity)."""
+    if center:
+        M = M - M.mean(axis=0)
     X = M / (np.linalg.norm(M, axis=1, keepdims=True) + 1e-12)
     return np.abs(X @ X.T)
+
+
+def design_similarity(pos_l, pos_c):
+    """RSA: pearson r between centered learned slot similarities and the
+    hand-designed ones, plus the two group means (reg-reg vs role-distinct)."""
+    iu = np.triu_indices(pos_l.shape[0], 1)
+    sl = abscos(pos_l, center=True)[iu]
+    sc = abscos(pos_c)[iu]
+    r = np.corrcoef(sl, sc)[0, 1]
+    reg = sl[np.isclose(sc, 0.5)]
+    oth = sl[np.isclose(sc, 0.0)]
+    return r, reg.mean(), oth.mean()
 
 
 def constructed_vectors():
@@ -94,9 +110,17 @@ def main():
            f"learned: positional embeddings, d={a['d']}", "pos", fig)
     _panel(axes[1, 1], abscos(feat_l),
            f"learned: input-feature embeddings, d={a['d']}", "feat", fig)
-    fig.tight_layout()
+    r, mreg, moth = design_similarity(pos_l, pos_c)
+    fig.text(0.5, 0.005,
+             f"design similarity (centered RSA): r = {r:.3f}   "
+             f"reg-reg pairs {mreg:.3f} (design 0.5)   "
+             f"role-distinct {moth:.3f} (design 0.0)",
+             ha="center", fontsize=9)
+    fig.tight_layout(rect=(0, 0.02, 1, 1))
     fig.savefig(args.out, dpi=140)
     print(f"saved {args.out}")
+    print(f"design similarity (centered RSA): r = {r:.3f}  "
+          f"reg-reg {mreg:.3f} vs role-distinct {moth:.3f}")
 
 
 if __name__ == "__main__":
