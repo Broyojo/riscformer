@@ -128,7 +128,7 @@
   \draw[busarr, rounded corners=3pt] (ram.south) |- ($(emb.east)+(0,3pt)$);
   \node[t8, anchor=east, text=buscol] at ($(ram.south)+(-8pt,-30pt)$) {fetch RAM[PC]};
   \draw[busarr, rounded corners=3pt] (p7.east) -- (p7.east -| ram.north) -- (ram.north);
-  \node[t8, anchor=south east, text=buscol] at ($(p7.east -| ram.north)+(-8pt,4pt)$) {load $\cdot$ store $\cdot$ ecall};
+  \node[t8, rotate=-90, anchor=west, text=buscol] at ($(p7.east -| ram.north)+(12pt,-16pt)$) {load $\cdot$ store $\cdot$ ecall};
   % recurrence lane (outermost right)
   \coordinate (rtap) at ($(p7.north)+(0,20pt)$);
   \draw[flow, rounded corners=4pt] (rtap) -- ++(230pt,0) |- ($(emb.east)+(0,-4pt)$);
